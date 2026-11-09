@@ -1,4 +1,12 @@
-# Odyssey ghost co-op (phase 1)
+# Odyssey ghost co-op (abandoned)
+
+> **Status: abandoned (2026-11-09).** The goal was co-op where friends appear as real
+> player heroes in your world. With a VMProtect + Denuvo exe, that would mean code
+> injection into a protected program, which this project will not do. Its read-only
+> ceiling is "ghost" co-op: friends on a minimap and as see-through, animated original
+> figures drawn over the game. They can't be hidden behind walls, and they aren't game
+> characters. Everything below works and is tested (in-game with bot friends); nobody
+> is developing it further. Fork freely (MIT).
 
 Each player runs their own copy of Assassin's Creed Odyssey. This tool reads your
 character's position from the running game, **read-only**, and syncs it with your
