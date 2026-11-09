@@ -1,14 +1,15 @@
 """In-game session with bot friends (needs the game running and local/paths.json).
 
 You host from your real game. Up to three bots join over UDP like real friends would (4 players):
-  "Shadow" - follows your real path 3 s behind, 3 m to your right
-  "Orbit"  - circles you at 12 m
-  "Walker" - replays your previous recorded walk, moved to start 6 m east of you
+  "Shadow" - walks exactly your path 2.5 s behind you
+  "Orbit"  - circles you at 12 m (at your height, so it can float or sink on slopes)
+  "Walker" - walks exactly your path 8 s behind you
+Shadow and Walker reuse real positions you stood on, so they stay on the ground. (A replay
+moved somewhere else can't: the mod has no terrain heights, which is why the old Walker floated.)
 The minimap shows them. With local/camera_paths.json each one is also drawn as an animated
 figure in the game view.
 
-Every 0.5 s the session logs to local/session.jsonl. Your path is recorded to local/walk.jsonl
-(the previous one is kept as local/walk-prev.jsonl and is what Walker replays).
+Every 0.5 s the session logs to local/session.jsonl. Your path is recorded to local/walk.jsonl.
 Double-click the minimap to stop.
 """
 import json
@@ -22,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from odyssey_coop.net import Peer  # noqa: E402
 from odyssey_coop.overlay import Minimap  # noqa: E402
-from odyssey_coop.sources import FollowBot, GameSource, OrbitBot, ReplayBot  # noqa: E402
+from odyssey_coop.sources import FollowBot, GameSource, OrbitBot  # noqa: E402
 
 LOCAL = ROOT / "local"
 PORT = 27015
@@ -34,16 +35,10 @@ def main():
     host = Peer("you", game, port=PORT)
     # each bot reads the game through its own GameSource, like a separate program would
     peers = [host,
-             Peer("Shadow", FollowBot(GameSource(cfg, wait=True), delay=3.0, side=3.0), host="127.0.0.1", port=PORT),
+             Peer("Shadow", FollowBot(GameSource(cfg, wait=True), delay=2.5, side=0.0), host="127.0.0.1", port=PORT),
+             Peer("Walker", FollowBot(GameSource(cfg, wait=True), delay=8.0, side=0.0), host="127.0.0.1", port=PORT),
              Peer("Orbit", OrbitBot(GameSource(cfg, wait=True), radius=12.0), host="127.0.0.1", port=PORT)]
-    walk, prev = LOCAL / "walk.jsonl", LOCAL / "walk-prev.jsonl"
-    here = game.position()
-    if walk.exists() and walk.stat().st_size and here:
-        walk.replace(prev)
-        first = json.loads(prev.read_text().splitlines()[0])[1:4]
-        bot = ReplayBot(prev, offset=(here[0] - first[0] + 6.0, here[1] - first[1], here[2] - first[2]))
-        bot.build = game.build
-        peers.append(Peer("Walker", bot, host="127.0.0.1", port=PORT))
+    walk = LOCAL / "walk.jsonl"
     for p in peers:
         p.start()
 

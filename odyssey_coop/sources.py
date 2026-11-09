@@ -65,6 +65,7 @@ class GameSource:
 
     MAX_COPIES = 32
     MAX_PATHS = 48
+    REVOTE = 1.0  # seconds between full re-checks of every path / copy
 
     def __init__(self, cfg_path, wait=False):
         self.cfg_path = Path(cfg_path)
@@ -76,6 +77,7 @@ class GameSource:
             for p in json.loads(paths_file.read_text())["paths"][: self.MAX_PATHS]:
                 self.paths.append({"module_offset": int(p["module_offset"], 16), "offsets": [int(o, 16) for o in p["offsets"]]})
         self.last_ok = time.time()
+        self.cached, self.voted_at = [], 0.0
         self.attaches = 0
         self.state = "no-game"  # "ok" in the world, "loading" on loading screens / menus
         if not self._attach():
@@ -133,7 +135,13 @@ class GameSource:
         return pos
 
     def _read(self):
-        counts, sample = Counter(), {}
+        # fast path: re-read the copies that agreed at the last full vote
+        if len(self.cached) >= 2 and time.time() - self.voted_at < self.REVOTE:
+            vals = [self.proc.read_floats(a, 3) for a in self.cached]
+            if all(self._valid(v) for v in vals) and max(math.dist(v, vals[0]) for v in vals) < 0.05:
+                return vals[0]
+        self.voted_at = time.time()
+        counts, sample, agree = Counter(), {}, {}
         try:
             addrs = self._addresses()
         except OSError:
@@ -144,9 +152,12 @@ class GameSource:
                 key = tuple(round(c, 1) for c in v)
                 counts[key] += 1
                 sample.setdefault(key, v)
+                agree.setdefault(key, []).append(a)
         if not counts:
+            self.cached = []
             return None
         best, n = counts.most_common(1)[0]
+        self.cached = agree[best][:3]
         return sample[best] if n >= 2 or len(addrs) == 1 else None
 
 

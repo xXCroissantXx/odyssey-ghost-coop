@@ -117,6 +117,42 @@ class Projection(unittest.TestCase):
         behind = figure_shapes(cam, drive(Animator(), [[0, -20, 0]] * 3).joints(), 1920, 1080)
         self.assertIsNone(behind)
 
+    def test_solid_figure_parts(self):
+        cam = make_cam([0, -5, 1.7])
+        a = drive(Animator(), [[0, 1.5 * i * 0.05, 0] for i in range(40)])  # walking north, away from camera
+        s = figure_shapes(cam, a.joints(), 1920, 1080)
+        self.assertEqual(len(s["cloak"]), 5)
+        self.assertEqual(len(s["torso"]), 4)
+        self.assertEqual(len(s["hood"]), 4)
+        self.assertEqual(len(s["legs"]), 4)
+        self.assertEqual(len(s["arms"]), 4)
+        j = a.joints()
+        self.assertLess(j["cloak_mid_hem"][1], j["chest"][1], "cloak hangs behind the walker")
+        self.assertGreater(j["hood_peak"][2], j["head"][2], "hood peak sits above the head")
+        run = drive(Animator(), [[0, 6.0 * i * 0.05, 0] for i in range(40)]).joints()
+        walk_flare = j["chest"][1] - j["cloak_mid_hem"][1]
+        run_flare = run["chest"][1] - run["cloak_mid_hem"][1]
+        self.assertGreater(run_flare, walk_flare, "cloak flares more when running")
+
+    def test_draw_figure_on_canvas(self):
+        import tkinter as tk
+        from odyssey_coop.world_overlay import KEY, draw_figure, shade
+        for col in ("#4fc3f7", "#000000", "#010203", "#ffffff"):
+            for f in (0.35, 0.6, 1.25):
+                self.assertNotEqual(shade(col, f).lower(), KEY, "a figure colour must never be the transparent key")
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            self.skipTest("no display")
+        try:
+            root.withdraw()
+            c = tk.Canvas(root, width=1920, height=1080)
+            s = figure_shapes(make_cam([0, -5, 1.7]), drive(Animator(), [[0, 0, 0]] * 3).joints(), 1920, 1080)
+            draw_figure(c, s, "#4fc3f7")
+            self.assertGreater(len(c.find_all()), 15)
+        finally:
+            root.destroy()
+
     def test_edge_marker_stays_on_screen(self):
         for sx, sy in [(5000, 540), (-300, -900), (960, 3000), (961, 541)]:
             x, y = edge_marker(sx, sy, 1920, 1080)

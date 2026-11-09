@@ -195,12 +195,14 @@ class CameraSource:
     """Live camera from pointer paths in local/camera_paths.json (majority of valid blocks)."""
 
     MAX_PATHS = 24
+    REVOTE = 1.0  # seconds between full re-checks of every path
 
     def __init__(self, game, paths_file):
         """game: a GameSource (its proc and mod_base follow game restarts)."""
         from . import pointers
         self._pointers = pointers
         self.game = game
+        self.cached, self.voted_at = None, 0.0
         data = json.loads(paths_file.read_text())
         self.paths = [{"module_offset": int(p["module_offset"], 16), "offsets": [int(o, 16) for o in p["offsets"]]}
                       for p in data["paths"][: self.MAX_PATHS]]
@@ -209,7 +211,12 @@ class CameraSource:
         proc, base = self.game.proc, getattr(self.game, "mod_base", None)
         if proc is None or base is None:
             return None
-        votes, sample = {}, {}
+        if self.cached and time.time() - self.voted_at < self.REVOTE:
+            cam = read_block(proc, self.cached)  # fast path: one read per frame
+            if cam is not None:
+                return cam
+        self.voted_at = time.time()
+        votes, sample, addr_of = {}, {}, {}
         for p in self.paths:
             a = self._pointers.resolve(proc, base, p)
             cam = read_block(proc, a) if a else None
@@ -217,9 +224,13 @@ class CameraSource:
                 k = tuple(np.round(cam["pos"], 1))
                 votes[k] = votes.get(k, 0) + 1
                 sample.setdefault(k, cam)
+                addr_of.setdefault(k, a)
         if not votes:
+            self.cached = None
             return None
-        return sample[max(votes, key=votes.get)]
+        best = max(votes, key=votes.get)
+        self.cached = addr_of[best]
+        return sample[best]
 
 
 def find_orientation(windows, cam_offset, player_samples, cam_samples, window_base_off):

@@ -108,6 +108,21 @@ class Animator:
                 e = _limb(sh, UPPER_ARM, -arm * ph)
                 h = _limb(e, FOREARM, -arm * ph + elbow)
             L[f"{side}_shoulder"], L[f"{side}_elbow"], L[f"{side}_hand"] = sh, e, h
+        # a short travelling cloak and a soft hood: generic shapes, flared back by speed
+        speed = math.hypot(self.vel[0], self.vel[1])
+        sway = min(0.45, 0.05 * speed) + 0.03 * math.sin(p * 2)
+        lift = min(0.25, 0.02 * speed)
+        cy, cz = L["chest"][1], L["chest"][2]
+        L["cloak_l_top"] = (-SHOULDER_W - 0.02, cy - 0.06, cz)
+        L["cloak_r_top"] = (SHOULDER_W + 0.02, cy - 0.06, cz)
+        L["cloak_r_hem"] = (SHOULDER_W + 0.08, cy - 0.16 - sway, 0.62 + lift)
+        L["cloak_mid_hem"] = (0.0, cy - 0.20 - sway * 1.2, 0.56 + lift)
+        L["cloak_l_hem"] = (-SHOULDER_W - 0.08, cy - 0.16 - sway, 0.62 + lift)
+        hx, hy, hz = L["head"]
+        L["hood_peak"] = (hx, hy - 0.15, hz + 0.07)
+        L["hood_l"] = (hx - HEAD_R * 1.15, hy - 0.03, hz - 0.02)
+        L["hood_r"] = (hx + HEAD_R * 1.15, hy - 0.03, hz - 0.02)
+        L["hood_back"] = (hx, hy - 0.16, hz - 0.10)
         # rotate local (+y forward) into the world by facing, then move to the player
         c, sn = math.cos(self.facing), math.sin(self.facing)
         x0, y0, z0 = self.pos
