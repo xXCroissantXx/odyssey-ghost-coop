@@ -184,4 +184,11 @@ class WorldOverlay:
         self.win.after(max(1, int(33 - spent)), self.draw)
 
     def start(self):
+        # Tk timers follow the Windows timer tick (15.6 ms by default), which rounded every
+        # frame wait up and capped the overlay at ~24 fps. Ask for 1 ms ticks while we run.
+        try:
+            ctypes.windll.winmm.timeBeginPeriod(1)
+            self.win.bind("<Destroy>", lambda e: ctypes.windll.winmm.timeEndPeriod(1) if e.widget is self.win else None)
+        except (AttributeError, OSError):
+            pass
         self.draw()
