@@ -1,0 +1,5 @@
+# per-machine scan results (addresses, pointer paths, process ids)
+local/
+__pycache__/
+*.pyc
+.venv/
