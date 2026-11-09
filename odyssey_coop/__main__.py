@@ -149,6 +149,27 @@ def cmd_check_paths(args):
         print(f"kept {len(keep)} paths that agree", flush=True)
 
 
+def cmd_camscan(args):
+    """Find the camera: stand still, then swing the camera around when told."""
+    from . import pointers
+    from .camera import run_scan
+    from .sources import GameSource
+    game = GameSource(CFG)
+    base, size = pointers.main_module(game.proc)
+    regions = [(b, s) for b, s in pointers.scan_regions(game.proc, base, size)]
+    go = LOCAL / "camscan.go"
+    go.unlink(missing_ok=True)
+    res = run_scan(game, regions, go, lambda m: print(m, flush=True),
+                   rotate_seconds=args.rotate, window_seconds=args.window)
+    go.unlink(missing_ok=True)
+    out = LOCAL / "camscan.json"
+    out.write_text(json.dumps(res, indent=1))
+    for c in res.get("candidates", [])[:10]:
+        print(f"  0x{c['addr']:X} motion {c['motion']} m, distance {c['dist']} m (std {c['dist_std']}), "
+              f"orientation blocks {len(c['orientation'])}", flush=True)
+    print(f"saved {out}", flush=True)
+
+
 def cmd_watch(args):
     from .sources import GameSource
     src = GameSource(CFG)
@@ -242,11 +263,16 @@ def main():
         p.add_argument("--duration", type=float, default=0, help="stop after N seconds (tests)")
         p.add_argument("--flip-x", action="store_true")
         p.add_argument("--flip-y", action="store_true")
+    cs = sub.add_parser("camscan")
+    cs.add_argument("--rotate", type=float, default=20)
+    cs.add_argument("--window", type=float, default=15)
     r = sub.add_parser("record")
     r.add_argument("--out", default=str(LOCAL / "walk.jsonl"))
     r.add_argument("--seconds", type=float, default=60)
     a = ap.parse_args()
-    if a.cmd == "record":
+    if a.cmd == "camscan":
+        cmd_camscan(a)
+    elif a.cmd == "record":
         LOCAL.mkdir(exist_ok=True)
         cmd_record(a)
     elif a.cmd == "scan":

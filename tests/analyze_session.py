@@ -39,7 +39,15 @@ def main(path=ROOT / "local" / "session.jsonl"):
     if gap_start is not None:
         print(f"  {gap_start:6.0f}s  no position until the end")
     print(f"distance moved (excluding jumps): {dist:.0f} m; game attached {rows[-1]['attaches']} time(s)")
-    for bot in ("Shadow", "Orbit"):
+    names = sorted({n for r in rows for n in r["bots"]})
+    last = rows[-1]
+    if last.get("overlay"):
+        o = last["overlay"]
+        print(f"world overlay: {o['frames']} frames drawn, camera missing in {o['no_camera']}")
+        from collections import Counter
+        anims = Counter(s for r in rows if r.get("anim") for s in r["anim"].values())
+        print("animation states seen:", dict(anims))
+    for bot in names:
         have = [r for r in rows if r["me"] and bot in r["bots"]]
         fresh = sum(1 for r in have if r["bots"][bot]["age"] < 1.0)
         with_me = sum(1 for r in rows if r["me"])
