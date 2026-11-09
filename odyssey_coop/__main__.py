@@ -4,7 +4,8 @@
   python -m odyssey_coop watch                      print the live position from the saved address
   python -m odyssey_coop host --name Alec           host a session (UDP port 27015)
   python -m odyssey_coop join HOST --name Sam       join a friend's session
-  add --fake to host/join to use a bot instead of the game; --no-overlay prints to the console
+  python -m odyssey_coop record --seconds 60        record your real walk for a replay bot
+  add --bot circle|orbit|follow|replay to host/join to play as a bot; --no-overlay prints to the console
 """
 import argparse
 import json
@@ -157,10 +158,43 @@ def cmd_watch(args):
         time.sleep(0.1)
 
 
+def cmd_record(args):
+    """Record your real movement to a file that a ReplayBot can walk later."""
+    from .sources import GameSource
+    src = GameSource(CFG)
+    out = Path(args.out)
+    n, t_end = 0, time.time() + args.seconds
+    with out.open("w") as f:
+        print(f"recording {args.seconds:.0f}s to {out}; move around in the game", flush=True)
+        while time.time() < t_end:
+            p = src.position()
+            if p is not None:
+                f.write(json.dumps([round(time.time(), 3)] + [round(c, 3) for c in p]) + "\n")
+                n += 1
+            time.sleep(0.05)
+    print(f"saved {n} samples", flush=True)
+
+
+def make_source(args):
+    from .sources import CircleBot, FollowBot, GameSource, OrbitBot, ReplayBot
+    bot = "circle" if args.fake else args.bot
+    if bot == "circle":
+        return CircleBot(seed=args.seed)
+    if bot == "replay":
+        if not args.replay:
+            raise SystemExit("--bot replay needs --replay FILE (make one with `record`)")
+        return ReplayBot(args.replay, offset=(args.side, 0.0, 0.0))
+    game = GameSource(CFG, wait=True)
+    if bot == "orbit":
+        return OrbitBot(game, radius=args.radius)
+    if bot == "follow":
+        return FollowBot(game, delay=args.delay, side=args.side)
+    return game
+
+
 def run_peer(args, host):
     from .net import Peer
-    from .sources import FakeSource, GameSource
-    src = FakeSource(seed=args.seed) if args.fake else GameSource(CFG)
+    src = make_source(args)
     peer = Peer(args.name, src, host=host, port=args.port)
     peer.start()
     print(("hosting on UDP port %d" % args.port) if host is None else f"joining {host}:{args.port}", "as", args.name)
@@ -196,14 +230,26 @@ def main():
             p.add_argument("host")
         p.add_argument("--name", required=True)
         p.add_argument("--port", type=int, default=27015)
-        p.add_argument("--fake", action="store_true", help="use a bot that walks in circles instead of the game")
+        p.add_argument("--fake", action="store_true", help="same as --bot circle")
+        p.add_argument("--bot", choices=["circle", "orbit", "follow", "replay"],
+                       help="play as a bot: circle (no game), orbit / follow (around your live game position), replay (a recording)")
+        p.add_argument("--replay", help="recording file for --bot replay")
+        p.add_argument("--radius", type=float, default=25.0, help="orbit radius in metres")
+        p.add_argument("--delay", type=float, default=3.0, help="follow delay in seconds")
+        p.add_argument("--side", type=float, default=3.0, help="follow / replay side offset in metres")
         p.add_argument("--seed", type=int, default=0)
         p.add_argument("--no-overlay", action="store_true")
         p.add_argument("--duration", type=float, default=0, help="stop after N seconds (tests)")
         p.add_argument("--flip-x", action="store_true")
         p.add_argument("--flip-y", action="store_true")
+    r = sub.add_parser("record")
+    r.add_argument("--out", default=str(LOCAL / "walk.jsonl"))
+    r.add_argument("--seconds", type=float, default=60)
     a = ap.parse_args()
-    if a.cmd == "scan":
+    if a.cmd == "record":
+        LOCAL.mkdir(exist_ok=True)
+        cmd_record(a)
+    elif a.cmd == "scan":
         cmd_scan(a)
     elif a.cmd == "check-paths":
         cmd_check_paths(a)

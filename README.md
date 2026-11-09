@@ -32,7 +32,19 @@ Over the internet, the host must forward UDP port 27015, or everyone can join th
 same Tailscale/ZeroTier network and use its IP address. The overlay can be dragged;
 double-click it to close. If friends appear mirrored, add `--flip-x` / `--flip-y`.
 
+## Bot friends (no second player needed)
+    python -m odyssey_coop host --name me                     # in one window, from your game
+    python -m odyssey_coop join 127.0.0.1 --name Shadow --bot follow   # trails your real path 3 s behind
+    python -m odyssey_coop join 127.0.0.1 --name Orbit --bot orbit     # circles you at 25 m
+    python -m odyssey_coop record --seconds 60                # record a walk...
+    python -m odyssey_coop join 127.0.0.1 --name Ghost --bot replay --replay local/walk.jsonl
+    python tests/ingame_session.py                            # all of it at once, logged
+    python tests/analyze_session.py                           # what happened: gaps, fast travel, bots
+
 ## Tests (no game needed)
+    python tests/test_network.py   # bad link (loss, jitter, duplicates), outages, host restart,
+                                   # junk packets, duplicate names, version mismatch, bots, overlay
+    python tests/soak.py --minutes 10
     python tests/test_bots.py
 
 A dummy process plays the part of the game for the memory scan, and three bot players
@@ -52,6 +64,12 @@ test the network sync.
 - Friends on the **same Steam build (17083392)** can copy `local/paths.json` and skip the
   scan entirely. After a game update, rerun `scan`, then `pointers`, then `check-paths --prune`
   after a restart.
+
+- Bot-friend session in the real game (9.5 min, with fast travel and a game restart mid-session).
+  Both bots stayed fresh in every sample. The mod re-attached to the restarted game by itself.
+  Loading screens report a fixed placeholder (-94.7, 33.8, -4.3), and the main menu reports
+  its background character near (-47, -15, 0). Both are now treated as "loading": friends see
+  you greyed out at your last real spot.
 
 ## Commands
     python -m odyssey_coop scan                 # one-off: find the position by climbing/dropping
